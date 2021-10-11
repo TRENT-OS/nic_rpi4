@@ -28,7 +28,7 @@
 
 #include <circle/netdevice.h>
 #include <circle/macaddress.h>
-#include <circle/timer.h>
+// #include <circle/timer.h>
 #include <circle/spinlock.h>
 #include <circle/types.h>
 
@@ -77,7 +77,7 @@ public:
 
 	boolean Initialize (void);
 
-	const CMACAddress *GetMACAddress (void) const;
+	// const CMACAddress *GetMACAddress (void) const;
 
 	// returns TRUE if TX ring has currently free buffers
 	boolean IsSendFrameAdvisable (void);
@@ -94,6 +94,10 @@ public:
 
 	// update device settings according to PHY status
 	boolean UpdatePHY (void);
+
+	// interrupt handlers
+	void InterruptHandler0 (void);
+	void InterruptHandler1 (void);
 
 private:
 	// UMAC
@@ -150,10 +154,6 @@ private:
 
 	void udelay (unsigned nMicroSeconds);
 
-	// interrupt handlers
-	void InterruptHandler0 (void);
-	void InterruptHandler1 (void);
-
 	static void InterruptStub0 (void *pParam);
 	static void InterruptStub1 (void *pParam);
 
@@ -172,7 +172,7 @@ private:
 	int phy_read_status(void);
 
 private:
-	CTimer *m_pTimer;
+	// CTimer *m_pTimer;
 	CMACAddress m_MACAddress;
 	boolean m_bInterruptConnected;
 

@@ -1,0 +1,196 @@
+/*
+ * RasPi SPI Flash storage driver
+ *
+ * Copyright (C) 2020, HENSOLDT Cyber GmbH
+ */
+
+#pragma once
+
+import <std_connector.camkes>;
+#include <if_OS_Nic.camkes>;
+import <if_OS_Timer.camkes>;
+import <if_OS_Logger.camkes>;
+
+//------------------------------------------------------------------------------
+
+
+#define NIC_RPI4_MAILBOX_BCM2711_DATAPORT_PADDR  	0xFE00B000
+#define NIC_RPI4_MAILBOX_BCM2711_DATAPORT_SIZE   	0x1000
+
+#define NIC_RPI4_SYSTIMER_BCM2711_DATAPORT_PADDR  	0xFE003000
+#define NIC_RPI4_SYSTIMER_BCM2711_DATAPORT_SIZE   	0x1000
+
+#define NIC_RPI4_GENET_BCM2711_DATAPORT_PADDR      	0xFD580000
+#define NIC_RPI4_GENET_BCM2711_DATAPORT_SIZE       	0x10000
+#define NIC_RPI4_GENETA_BCM2711_IRQ                	189
+#define NIC_RPI4_GENETB_BCM2711_IRQ                	190
+
+
+//------------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------------
+// Component declaration
+
+#define NIC_RPi4_Systimer_COMPONENT_DEFINE( \
+    _name_) \
+    \
+    component _name_ { \
+        hardware; \
+        dataport Buf systimerBaseReg; \
+    }
+
+#define NIC_RPi4_Mailbox_COMPONENT_DEFINE( \
+    _name_) \
+    \
+    component _name_ { \
+        hardware; \
+        dataport Buf mailboxBaseReg; \
+    }
+
+#define NIC_RPi4_Genet_COMPONENT_DEFINE( \
+    _name_) \
+    \
+    component _name_ { \
+        hardware; \
+        dataport Buf(NIC_RPI4_GENET_BCM2711_DATAPORT_SIZE) genetBaseReg; \
+        emits DataAvailable genetA_BaseIrq; \
+        emits DataAvailable genetB_BaseIrq; \
+    }
+
+#define NIC_RPi4_COMPONENT_DEFINE( \
+    _name_, \
+    _ringbuffer_size_) \
+    \
+    component _name_ { \
+        control; \
+        \
+        /* lower interface to USB ------------------------------------- */ \
+        dataport Buf systimerBaseReg; \
+        dataport Buf mailboxBaseReg; \
+        dataport Buf(NIC_RPI4_GENET_BCM2711_DATAPORT_SIZE) genetBaseReg; \
+        consumes DataAvailable genetA_BaseIrq; \
+        consumes DataAvailable genetB_BaseIrq; \
+        \
+        /* upper interface as NIC Driver ---------------------------------- */ \
+        provides if_OS_Nic nic_rpc; \
+        emits EventDataAvailable nic_event_hasData; \
+        dataport Buf(_ringbuffer_size_) nic_to_port; /* driver -> network stack */  \
+        dataport Buf                    nic_from_port; /* network stack -> driver */ \
+        has semaphore nic_driver_init_done; \
+        has mutex nic_mutex; \
+        /* optional connection to the LogServer */ \
+        maybe uses      if_OS_Logger            logServer_rpc; \
+        maybe dataport  Buf                     logServer_port; \
+        \
+        /* usage of Timer ---------------------------------- */ \
+        uses if_OS_Timer timeServer_rpc; \
+        consumes TimerReady timeServer_notify; \
+    }
+
+//------------------------------------------------------------------------------
+// Instance declaration
+
+#define NIC_RPi4_INSTANCE_CONNECT( \
+    _inst_, \
+    _inst_mb_, \
+    _inst_st_, \
+    _inst_gn_) \
+    \
+    connection  seL4HardwareMMIO \
+        _inst_ ## _inst_mb_ ## _mmio( \
+            from _inst_.mailboxBaseReg, \
+            to   _inst_mb_.mailboxBaseReg \
+        ); \
+    \
+    connection  seL4HardwareMMIO \
+        _inst_ ## _inst_st_ ## _mmio( \
+            from _inst_.systimerBaseReg, \
+            to   _inst_st_.systimerBaseReg \
+        ); \
+    \
+    connection  seL4HardwareMMIO \
+        _inst_ ## _inst_gn_ ## _mmio( \
+            from _inst_.genetBaseReg, \
+            to   _inst_gn_.genetBaseReg \
+        ); \
+    \
+    connection  seL4HardwareInterrupt \
+        _inst_ ## _inst_gn_a_ ## _irq( \
+            from _inst_gn_.genetA_BaseIrq, \
+            to   _inst_.genetA_BaseIrq \
+        ); \
+    \
+    connection  seL4HardwareInterrupt \
+        _inst_ ## _inst_gn_b_ ## _irq( \
+            from _inst_gn_.genetB_BaseIrq, \
+            to   _inst_.genetB_BaseIrq \
+        );
+
+
+#define NIC_RPi4_INSTANCE_CONNECT_CLIENT( \
+    _inst_, \
+    _nic_rpc_, \
+    _nic_dp_to_, \
+    _nic_dp_from_, \
+    _nic_ev_) \
+    \
+    connection seL4NotificationNative  \
+        _inst_ ## _nic_ev( \
+            from    _inst_.nic_event_hasData,\
+            to      _nic_ev_); \
+    connection seL4RPCCall \
+        _inst_ ## _nic_rpc( \
+            from    _nic_rpc_, \
+            to      _inst_.nic_rpc); \
+    connection seL4SharedData \
+        _inst_ ## _nic_dp_from ( \
+            from    _inst_.nic_to_port, \
+            to      _nic_dp_from_); \
+    connection seL4SharedData \
+        _inst_ ## _nic_dp_to( \
+            from    _inst_.nic_from_port, \
+            to      _nic_dp_to_);
+
+//------------------------------------------------------------------------------
+// Instance configuration
+
+#define NIC_RPi4_Mailbox_INSTANCE_CONFIGURE_SELF( \
+    _inst_) \
+    \
+    _inst_.mailboxBaseReg_paddr  = NIC_RPI4_MAILBOX_BCM2711_DATAPORT_PADDR; \
+    _inst_.mailboxBaseReg_size   = NIC_RPI4_MAILBOX_BCM2711_DATAPORT_SIZE;
+
+#define NIC_RPi4_Systimer_INSTANCE_CONFIGURE_SELF( \
+    _inst_) \
+    \
+    _inst_.systimerBaseReg_paddr  = NIC_RPI4_SYSTIMER_BCM2711_DATAPORT_PADDR; \
+    _inst_.systimerBaseReg_size   = NIC_RPI4_SYSTIMER_BCM2711_DATAPORT_SIZE;
+
+#define NIC_RPi4_Genet_INSTANCE_CONFIGURE_SELF( \
+    _inst_) \
+    \
+    _inst_.genetBaseReg_paddr      = NIC_RPI4_GENET_BCM2711_DATAPORT_PADDR; \
+    _inst_.genetBaseReg_size       = NIC_RPI4_GENET_BCM2711_DATAPORT_SIZE; \
+    _inst_.genetA_BaseIrq_irq_number = NIC_RPI4_GENETA_BCM2711_IRQ; \
+    _inst_.genetB_BaseIrq_irq_number = NIC_RPI4_GENETB_BCM2711_IRQ;
+
+#define NIC_RPi4_INSTANCE_CONFIGURE( \
+    _inst_, \
+    _dma_size_) \
+    \
+    _inst_.dma_pool                     = _dma_size_; \
+    _inst_.nic_driver_init_done_value   = 0;
+
+
+//------------------------------------------------------------------------------
+// Connect a LogServer to the NIC
+#define NIC_RPi4_INSTANCE_CONNECT_OPTIONAL_LOGGER(_nic_, _logserver_) \
+    \
+    connection seL4RPCCall conn_ ## _nic_ ## _ ## _logserver_ ## _rpc( \
+        from _nic_.logServer_rpc, \
+        to   _logserver_.logServer_rpc); \
+    \
+    connection seL4SharedData  conn_ ## _nic_ ## _ ## _logserver_ ## _port( \
+        from  _nic_.logServer_port, \
+        to    _logserver_.nwDriver_port);

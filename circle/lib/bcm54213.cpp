@@ -33,16 +33,24 @@
 //
 #include <circle/bcm54213.h>
 #include <circle/bcmpropertytags.h>
-#include <circle/interrupt.h>
+// #include <circle/interrupt.h>
 #include <circle/bcm2711int.h>
 #include <circle/memio.h>
 #include <circle/bcm2711.h>
 #include <circle/synchronize.h>
-#include <circle/logger.h>
+// #include <circle/logger.h>
 #include <circle/string.h>
-#include <circle/util.h>
+// #include <circle/util.h>
 #include <circle/macros.h>
 #include <assert.h>
+
+extern "C"
+{
+#include <string.h>
+#include <circleos.h>
+#include <camkes.h>
+#include <camkes/io.h>
+}
 
 #define GENET_V5			5	// the only supported GENET version
 
@@ -577,13 +585,26 @@ GENET_IO_MACRO(rbuf, GENET_RBUF_OFF);
 
 static const char FromBcm54213[] = "genet";
 
+//------------------------------------------------------------------------------
+#define pr_err(...)			LogWrite (FromBcm54213, USPI_LOG_ERROR,  ##__VA_ARGS__)
+#define pr_warn(...)		LogWrite (FromBcm54213, USPI_LOG_WARNING,  ##__VA_ARGS__)
+#define pr_info(...)		LogWrite (FromBcm54213, USPI_LOG_NOTICE,  ##__VA_ARGS__)
+#define pr_debug(...)		LogWrite (FromBcm54213, USPI_LOG_DEBUG,  ##__VA_ARGS__)
+
+#define mdelay(ms)		MsDelay (ms)
+#define udelay(us)		usDelay (us)
+#define ndelay(ns)		nsDelay(ns)
+
+#define CLOCKHZ	1000000
+//------------------------------------------------------------------------------
+
 CBcm54213Device::CBcm54213Device (void)
-:	m_pTimer (CTimer::Get ()),
-	m_bInterruptConnected (FALSE),
+:	m_bInterruptConnected (FALSE),
 	m_tx_cbs (0),
-	m_rx_cbs (0)
+	m_rx_cbs (0),
+	m_link(0),
+	m_TxSpinLock(IRQ_LEVEL)
 {
-	assert (m_pTimer != 0);
 }
 
 CBcm54213Device::~CBcm54213Device (void)
@@ -598,8 +619,10 @@ CBcm54213Device::~CBcm54213Device (void)
 
 	if (m_bInterruptConnected)
 	{
-		CInterruptSystem::Get ()->DisconnectIRQ (ARM_IRQ_BCM54213_0);
-		CInterruptSystem::Get ()->DisconnectIRQ (ARM_IRQ_BCM54213_1);
+		DisconnectInterrupt(ARM_IRQ_BCM54213_0);
+		DisconnectInterrupt(ARM_IRQ_BCM54213_1);
+		// CInterruptSystem::Get ()->DisconnectIRQ (ARM_IRQ_BCM54213_0);
+		// CInterruptSystem::Get ()->DisconnectIRQ (ARM_IRQ_BCM54213_1);
 	}
 
 	if (m_rx_cbs != 0)
@@ -625,9 +648,7 @@ boolean CBcm54213Device::Initialize (void)
 		major = 1;
 	if (major != GENET_V5)
 	{
-		CLogger::Get ()->Write (FromBcm54213, LogError,
-					"GENET version mismatch, got: %d, configured for: %d",
-					(unsigned) major, GENET_V5);
+		pr_err("GENET version mismatch, got: %d, configured for: %d", (unsigned) major, GENET_V5);
 
 		return FALSE;
 	}
@@ -648,7 +669,7 @@ boolean CBcm54213Device::Initialize (void)
 	int ret = set_hw_addr();
 	if (ret)
 	{
-		CLogger::Get ()->Write (FromBcm54213, LogError, "Cannot set MAC address (%d)", ret);
+		pr_err("Cannot set MAC address (%d)", ret);
 
 		return FALSE;
 	}
@@ -658,7 +679,7 @@ boolean CBcm54213Device::Initialize (void)
 	ret = init_dma();			// reinitialize TDMA and RDMA and SW housekeeping
 	if (ret)
 	{
-		CLogger::Get ()->Write (FromBcm54213, LogError, "Failed to initialize DMA (%d)", ret);
+		pr_err("Failed to initialize DMA (%d)", ret);
 
 		return FALSE;
 	}
@@ -668,17 +689,21 @@ boolean CBcm54213Device::Initialize (void)
 	hfb_init();
 
 	assert (!m_bInterruptConnected);
-	CInterruptSystem::Get ()->ConnectIRQ (ARM_IRQ_BCM54213_0, InterruptStub0, this);
-	CInterruptSystem::Get ()->ConnectIRQ (ARM_IRQ_BCM54213_1, InterruptStub1, this);
+	ConnectInterrupt(ARM_IRQ_BCM54213_0, InterruptStub0, NULL);
+	ConnectInterrupt(ARM_IRQ_BCM54213_1, InterruptStub1, NULL);
+	// CInterruptSystem::Get ()->ConnectIRQ (ARM_IRQ_BCM54213_0, InterruptStub0, this);
+	// CInterruptSystem::Get ()->ConnectIRQ (ARM_IRQ_BCM54213_1, InterruptStub1, this);
 	m_bInterruptConnected = TRUE;
 
 	ret = mii_probe();
 	if (ret)
 	{
-		CLogger::Get ()->Write (FromBcm54213, LogError, "Failed to connect to PHY (%d)", ret);
+		pr_err("Failed to connect to PHY (%d)", ret);
 
-		CInterruptSystem::Get ()->DisconnectIRQ (ARM_IRQ_BCM54213_0);
-		CInterruptSystem::Get ()->DisconnectIRQ (ARM_IRQ_BCM54213_1);
+		DisconnectInterrupt(ARM_IRQ_BCM54213_0);
+		DisconnectInterrupt(ARM_IRQ_BCM54213_1);
+		// CInterruptSystem::Get ()->DisconnectIRQ (ARM_IRQ_BCM54213_0);
+		// CInterruptSystem::Get ()->DisconnectIRQ (ARM_IRQ_BCM54213_1);
 		m_bInterruptConnected = FALSE;
 
 		return FALSE;
@@ -693,10 +718,10 @@ boolean CBcm54213Device::Initialize (void)
 	return TRUE;
 }
 
-const CMACAddress *CBcm54213Device::GetMACAddress (void) const
-{
-	return &m_MACAddress;
-}
+// const CMACAddress *CBcm54213Device::GetMACAddress (void) const
+// {
+// 	return &m_MACAddress;
+// }
 
 boolean CBcm54213Device::IsSendFrameAdvisable (void)
 {
@@ -728,13 +753,13 @@ boolean CBcm54213Device::SendFrame (const void *pBuffer, unsigned nLength)
 
 	TGEnetTxRing *ring = &m_tx_rings[index];
 
-	m_TxSpinLock.Acquire ();
+	// m_TxSpinLock.Acquire ();
 
 	if (ring->free_bds < 2)				// is there room for this frame?
 	{
-		CLogger::Get ()->Write (FromBcm54213, LogWarning, "TX frame dropped");
+		pr_warn("TX frame dropped");
 
-		m_TxSpinLock.Release ();
+		// m_TxSpinLock.Release ();
 
 		return FALSE;
 	}
@@ -751,7 +776,7 @@ boolean CBcm54213Device::SendFrame (const void *pBuffer, unsigned nLength)
 	assert (tx_cb_ptr != 0);
 
 	// prepare for DMA
-	CleanAndInvalidateDataCacheRange ((u32) (uintptr) pTxBuffer, nLength);
+	// CleanAndInvalidateDataCacheRange ((u32) (uintptr) pTxBuffer, nLength);
 
 	tx_cb_ptr->buffer = pTxBuffer;			// set DMA buffer in Tx control block
 
@@ -768,7 +793,7 @@ boolean CBcm54213Device::SendFrame (const void *pBuffer, unsigned nLength)
 	// packets are ready, update producer index
 	tdma_ring_writel(ring->index, ring->prod_index, TDMA_PROD_INDEX);
 
-	m_TxSpinLock.Release ();
+	// m_TxSpinLock.Release ();
 
 	return TRUE;
 }
@@ -817,7 +842,7 @@ boolean CBcm54213Device::ReceiveFrame (void *pBuffer, unsigned *pResultLength)
 		u8 *pRxBuffer = rx_refill (cb);
 		if (pRxBuffer == 0)
 		{
-			CLogger::Get ()->Write (FromBcm54213, LogWarning, "Missing RX buffer!");
+			pr_warn("Missing RX buffer!");
 
 			goto out;
 		}
@@ -829,8 +854,7 @@ boolean CBcm54213Device::ReceiveFrame (void *pBuffer, unsigned *pResultLength)
 		if (   !(dma_flag & DMA_EOP)
 		    || !(dma_flag & DMA_SOP))
 		{
-			CLogger::Get ()->Write (FromBcm54213, LogWarning,
-						"Dropping fragmented RX packet!");
+			pr_warn("Dropping fragmented RX packet!");
 
 			delete [] pRxBuffer;
 
@@ -840,8 +864,7 @@ boolean CBcm54213Device::ReceiveFrame (void *pBuffer, unsigned *pResultLength)
 		// report errors
 		if (dma_flag & (DMA_RX_CRC_ERROR | DMA_RX_OV | DMA_RX_NO | DMA_RX_LG | DMA_RX_RXER))
 		{
-			CLogger::Get ()->Write (FromBcm54213, LogWarning, "RX error (0x%x)",
-						(unsigned) dma_flag);
+			pr_warn("RX error (0x%x)",(unsigned) dma_flag);
 
 			delete [] pRxBuffer;
 
@@ -1038,26 +1061,25 @@ void CBcm54213Device::rx_ring16_int_enable(TGEnetRxRing *ring)
 
 int CBcm54213Device::set_hw_addr(void)
 {
-	CBcmPropertyTags Tags;
-	TPropertyTagMACAddress MACAddress;
-	if (!Tags.GetTag (PROPTAG_GET_MAC_ADDRESS, &MACAddress, sizeof MACAddress))
-	{
+	unsigned char address[6];
+	int ret = GetMACAddress(address);
+	if(!ret){
+		pr_err("GEtMACAddress failed!");
 		return -1;
 	}
 
-	m_MACAddress.Set (MACAddress.Address);
+	m_MACAddress.Set (address);
 
 	CString MACString;
 	m_MACAddress.Format (&MACString);
-	CLogger::Get ()->Write (FromBcm54213, LogDebug, "MAC address is %s",
-				(const char *) MACString);
+	pr_debug("MAC address is %s",(const char *) MACString);
 
-	umac_writel(  (MACAddress.Address[0] << 24)
-		    | (MACAddress.Address[1] << 16)
-		    | (MACAddress.Address[2] << 8)
-		    |  MACAddress.Address[3], UMAC_MAC0);
-	umac_writel((  MACAddress.Address[4] << 8)
-		     | MACAddress.Address[5], UMAC_MAC1);
+	umac_writel(  (address[0] << 24)
+		    | (address[1] << 16)
+		    | (address[2] << 8)
+		    |  address[3], UMAC_MAC0);
+	umac_writel((  address[4] << 8)
+		     | address[5], UMAC_MAC1);
 
 	return 0;
 }
@@ -1177,8 +1199,7 @@ int CBcm54213Device::init_dma(void)
 	int ret = init_rx_queues();
 	if (ret)
 	{
-		CLogger::Get ()->Write (FromBcm54213, LogError,
-					"Failed to initialize RX queues (%d)", ret);
+		pr_err("Failed to initialize RX queues (%d)", ret);
 		free_rx_buffers();
 		delete [] m_rx_cbs;
 		delete [] m_tx_cbs;
@@ -1497,7 +1518,7 @@ u8 *CBcm54213Device::rx_refill(struct TGEnetCB *cb)
 		return 0;
 
 	// prepare buffer for DMA
-	CleanAndInvalidateDataCacheRange ((u32) (uintptr) buffer, RX_BUF_LENGTH);
+	// CleanAndInvalidateDataCacheRange ((u32) (uintptr) buffer, RX_BUF_LENGTH);
 
 	// Grab the current Rx buffer from the ring and DMA-unmap it
 	u8 *rx_buffer = free_rx_cb(cb);
@@ -1515,7 +1536,7 @@ u8 *CBcm54213Device::free_rx_cb(TGEnetCB *cb)
 	u8 *buffer = cb->buffer;
 	cb->buffer = 0;
 
-	CleanAndInvalidateDataCacheRange ((u32) (uintptr) buffer, RX_BUF_LENGTH);
+	// CleanAndInvalidateDataCacheRange ((u32) (uintptr) buffer, RX_BUF_LENGTH);
 
 	return buffer;
 }
@@ -1529,8 +1550,14 @@ void CBcm54213Device::dmadesc_set(uintptr d, u8 *addr, u32 value)
 
 void CBcm54213Device::dmadesc_set_addr(uintptr d, u8 *addr)
 {
+	uintptr_t physAddr = dma_getPhysicalAddr(addr);
+
+	if(physAddr == 0){
+		pr_err("Physical address conversion failed! buffer = %p", addr);
+	}
+	write32(d + DMA_DESC_ADDRESS_LO, (u32) physAddr);
 	// should use BUS_ADDRESS() here, but does not work
-	write32(d + DMA_DESC_ADDRESS_LO, (u32) (uintptr) addr);
+	// write32(d + DMA_DESC_ADDRESS_LO, (u32) (uintptr) addr);
 
 	// Register writes to GISB bus can take couple hundred nanoseconds
 	// and are done for each packet, save these expensive writes unless
@@ -1544,10 +1571,10 @@ void CBcm54213Device::dmadesc_set_length_status(uintptr d, u32 value)
 	write32(d + DMA_DESC_LENGTH_STATUS, value);
 }
 
-void CBcm54213Device::udelay (unsigned nMicroSeconds)
-{
-	m_pTimer->usDelay (nMicroSeconds);
-}
+// void CBcm54213Device::udelay (unsigned nMicroSeconds)
+// {
+// 	m_pTimer->usDelay (nMicroSeconds);
+// }
 
 // handle Rx and Tx default queues + other stuff
 void CBcm54213Device::InterruptHandler0 (void)
@@ -1560,12 +1587,12 @@ void CBcm54213Device::InterruptHandler0 (void)
 	intrl2_0_writel(status, INTRL2_CPU_CLEAR);
 
 	if (status & UMAC_IRQ_TXDMA_DONE) {
-		m_TxSpinLock.Acquire ();
+		// m_TxSpinLock.Acquire ();
 
 		TGEnetTxRing *tx_ring = &m_tx_rings[GENET_DESC_INDEX];
 		tx_reclaim(tx_ring);
 
-		m_TxSpinLock.Release ();
+		// m_TxSpinLock.Release ();
 	}
 }
 
@@ -1579,7 +1606,7 @@ void CBcm54213Device::InterruptHandler1 (void)
 	// clear interrupts
 	intrl2_1_writel(status, INTRL2_CPU_CLEAR);
 
-	m_TxSpinLock.Acquire ();
+	// m_TxSpinLock.Acquire ();
 
 	// Check Tx priority queue interrupts
 	for (unsigned index = 0; index < TX_QUEUES; index++) {
@@ -1590,7 +1617,7 @@ void CBcm54213Device::InterruptHandler1 (void)
 		tx_reclaim(tx_ring);
 	}
 
-	m_TxSpinLock.Release ();
+	// m_TxSpinLock.Release ();
 }
 
 void CBcm54213Device::InterruptStub0 (void *pParam)
@@ -1822,12 +1849,14 @@ void CBcm54213Device::mdio_write(int reg, u16 val)
 // but a private function assigned by the GENET bcmmii module.
 void CBcm54213Device::mdio_wait(void)
 {
-	assert (m_pTimer != 0);
-	unsigned nStartTicks = m_pTimer->GetClockTicks ();
+	// assert (m_pTimer != 0);
+	// unsigned nStartTicks = m_pTimer->GetClockTicks ();
+	unsigned nStartTicks = GetClockTicks();
 
 	do
 	{
-		if (m_pTimer->GetClockTicks ()-nStartTicks >= CLOCKHZ / 100)
+		// if (m_pTimer->GetClockTicks ()-nStartTicks >= CLOCKHZ / 100)
+		if (GetClockTicks()-nStartTicks >= CLOCKHZ / 100)
 		{
 			break;
 		}
@@ -1866,8 +1895,7 @@ int CBcm54213Device::phy_read_status(void)
 		return ctrl1000;
 
 	if (lpagb & LPA_1000MSFAIL) {
-		CLogger::Get ()->Write (FromBcm54213, LogWarning,
-					"Master/Slave resolution failed (0x%X)", ctrl1000);
+		pr_warn("Master/Slave resolution failed (0x%X)", ctrl1000);
 		return -1;
 	}
 

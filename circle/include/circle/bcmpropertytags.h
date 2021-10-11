@@ -3,7 +3,7 @@
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
 // Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -16,7 +16,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-// 
+//
 #ifndef _circle_bcmpropertytags_h
 #define _circle_bcmpropertytags_h
 
@@ -68,7 +68,7 @@
 #define PROPTAG_GET_COMMAND_LINE	0x00050001
 #define PROPTAG_GET_DMA_CHANNELS	0x00060001
 
-struct TPropertyTag
+typedef struct TPropertyTag
 {
 	u32	nTagId;
 	u32	nValueBufSize;			// bytes, multiple of 4
@@ -76,34 +76,16 @@ struct TPropertyTag
 	#define VALUE_LENGTH_RESPONSE	(1 << 31)
 	//u8	ValueBuffer[0];			// must be padded to be 4 byte aligned
 }
-PACKED;
+TPropertyTag;
 
-struct TPropertyTagSimple
+typedef struct TPropertyTagSimple
 {
 	TPropertyTag	Tag;
 	u32		nValue;
 }
-PACKED;
+TPropertyTagSimple;
 
-struct TPropertyTagSetCursorInfo
-{
-	TPropertyTag	Tag;
-	union
-	{
-		u32	nWidth;			// should be >= 16
-		u32	nResponse;
-	#define CURSOR_RESPONSE_VALID	0	// response
-	}
-	PACKED;
-	u32		nHeight;		// should be >= 16
-	u32		nUnused;
-	u32		nPixelPointer;		// physical address, format 32bpp ARGB
-	u32		nHotspotX;
-	u32		nHotspotY;
-}
-PACKED;
-
-struct TPropertyTagSetCursorState
+typedef struct TPropertyTagSetCursorState
 {
 	TPropertyTag	Tag;
 	union
@@ -120,32 +102,32 @@ struct TPropertyTagSetCursorState
 	#define CURSOR_FLAGS_DISP_COORDS	0
 	#define CURSOR_FLAGS_FB_COORDS		1
 }
-PACKED;
+TPropertyTagSetCursorState;
 
-struct TPropertyTagMACAddress
+typedef struct TPropertyTagMACAddress
 {
 	TPropertyTag	Tag;
 	u8		Address[6];
 	u8		Padding[2];
 }
-PACKED;
+TPropertyTagMACAddress;
 
-struct TPropertyTagSerial
+typedef struct TPropertyTagSerial
 {
 	TPropertyTag	Tag;
 	u32		Serial[2];
 }
-PACKED;
+TPropertyTagSerial;
 
-struct TPropertyTagMemory
+typedef struct TPropertyTagMemory
 {
 	TPropertyTag	Tag;
 	u32		nBaseAddress;
 	u32		nSize;			// bytes
 }
-PACKED;
+TPropertyTagMemory;
 
-struct TPropertyTagPowerState
+typedef struct TPropertyTagPowerState
 {
 	TPropertyTag	Tag;
 	u32		nDeviceId;
@@ -157,9 +139,9 @@ struct TPropertyTagPowerState
 	#define POWER_STATE_WAIT	(1 << 1)
 	#define POWER_STATE_NO_DEVICE	(1 << 1)	// in response
 }
-PACKED;
+TPropertyTagPowerState;
 
-struct TPropertyTagClockRate
+typedef struct TPropertyTagClockRate
 {
 	TPropertyTag	Tag;
 	u32		nClockId;
@@ -171,19 +153,19 @@ struct TPropertyTagClockRate
 	#define CLOCK_ID_PIXEL_BVB	14
 	u32		nRate;			// Hz
 }
-PACKED;
+TPropertyTagClockRate;
 
-struct TPropertyTemperature
+typedef struct TPropertyTemperature
 {
 	TPropertyTag	Tag;
 	u32		nTemperatureId;
 	#define TEMPERATURE_ID		0
 	u32		nValue;			// degree Celsius * 1000
 }
-PACKED;
+TPropertyTemperature;
 #define TPropertyTagTemperature		TPropertyTemperature
 
-struct TPropertyTagTurbo
+typedef struct TPropertyTagTurbo
 {
 	TPropertyTag	Tag;
 	u32		nTurboId;
@@ -192,9 +174,9 @@ struct TPropertyTagTurbo
 	#define TURBO_OFF		0
 	#define TURBO_ON		1
 }
-PACKED;
+TPropertyTagTurbo;
 
-struct TPropertyTagGPIOState
+typedef struct TPropertyTagGPIOState
 {
 	TPropertyTag	Tag;
 	u32		nGPIO;
@@ -202,20 +184,9 @@ struct TPropertyTagGPIOState
 	#define EXP_GPIO_NUM		8
 	u32		nState;
 }
-PACKED;
+TPropertyTagGPIOState;
 
-struct TPropertyTagEDIDBlock
-{
-	TPropertyTag	Tag;
-	u32		nBlockNumber;
-	#define EDID_FIRST_BLOCK	0
-	u32		nStatus;
-	#define EDID_STATUS_SUCCESS	0
-	u8		Block[128];
-}
-PACKED;
-
-struct TPropertyTagSetClockRate
+typedef struct TPropertyTagSetClockRate
 {
 	TPropertyTag	Tag;
 	u32		nClockId;
@@ -223,58 +194,7 @@ struct TPropertyTagSetClockRate
 	u32		nSkipSettingTurbo;
 	#define SKIP_SETTING_TURBO	1	// when setting ARM clock
 }
-PACKED;
-
-struct TPropertyTagAllocateBuffer
-{
-	TPropertyTag	Tag;
-	union
-	{
-		u32	nAlignment;		// in bytes
-		u32	nBufferBaseAddress;
-	}
-	PACKED;
-	u32		nBufferSize;
-}
-PACKED;
-
-struct TPropertyTagDisplayDimensions
-{
-	TPropertyTag	Tag;
-	u32		nWidth;
-	u32		nHeight;
-}
-PACKED;
-
-struct TPropertyTagVirtualOffset
-{
-	TPropertyTag	Tag;
-	u32		nOffsetX;
-	u32		nOffsetY;
-}
-PACKED;
-
-struct TPropertyTagSetPalette
-{
-	TPropertyTag	Tag;
-	union
-	{
-		u32	nOffset;		// first palette index to set (0-255)
-		u32	nResult;
-	#define SET_PALETTE_VALID	0
-	}
-	PACKED;
-	u32		nLength;		// number of palette entries to set (1-256)
-	u32		Palette[0];		// RGBA values, offset to offset+length-1
-}
-PACKED;
-
-struct TPropertyTagCommandLine
-{
-	TPropertyTag	Tag;
-	u8		String[2048];
-}
-PACKED;
+TPropertyTagSetClockRate;
 
 class CBcmPropertyTags
 {
@@ -286,7 +206,7 @@ public:
 			void	 *pTag,				// pointer to tag struct
 			unsigned  nTagSize,			// size of tag struct
 			unsigned  nRequestParmSize = 0);	// number of parameter bytes
-	
+
 	boolean GetTags (void	 *pTags,			// pointer to tags struct
 			 unsigned nTagsSize);			// size of tags struct
 

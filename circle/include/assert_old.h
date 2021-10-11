@@ -3,7 +3,7 @@
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
 // Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -29,7 +29,9 @@ extern "C" {
 #ifdef NDEBUG
 	#define assert(expr)	((void) 0)
 #else
-	void assertion_failed (const char *pExpr, const char *pFile, unsigned nLine) NORETURN;
+void
+assertion_failed(const char* pExpr, const char* pFile, unsigned nLine)
+    __attribute__((noreturn));
 
 	#define assert(expr)	(  likely (expr)	\
 				 ? ((void) 0)		\

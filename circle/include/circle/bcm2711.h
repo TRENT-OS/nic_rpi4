@@ -45,7 +45,8 @@
 //
 // BCM54213PE Gigabit Ethernet Transceiver (external)
 //
-#define ARM_BCM54213_BASE	0xFD580000
+// #define ARM_BCM54213_BASE	0xFD580000
+#define ARM_BCM54213_BASE	((unsigned long)genetBaseReg)
 #define ARM_BCM54213_MDIO	(ARM_BCM54213_BASE + 0x0E14)
 #define ARM_BCM54213_MDIO_END	(ARM_BCM54213_BASE + 0x0E1B)
 #define ARM_BCM54213_END	(ARM_BCM54213_BASE + 0xFFFF)

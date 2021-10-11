@@ -3,7 +3,7 @@
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
 // Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -98,7 +98,8 @@
 //
 // System Timers
 //
-#define ARM_SYSTIMER_BASE	(ARM_IO_BASE + 0x3000)
+// #define ARM_SYSTIMER_BASE	(ARM_IO_BASE + 0x3000)
+#define ARM_SYSTIMER_BASE	((unsigned long)systimerBaseReg)
 
 #define ARM_SYSTIMER_CS		(ARM_SYSTIMER_BASE + 0x00)
 #define ARM_SYSTIMER_CLO	(ARM_SYSTIMER_BASE + 0x04)

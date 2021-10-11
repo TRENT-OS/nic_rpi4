@@ -128,7 +128,7 @@ size_t CString::GetLength (void) const
 	{
 		return 0;
 	}
-	
+
 	return strlen (m_pBuffer);
 }
 
@@ -258,7 +258,7 @@ void CString::FormatV (const char *pFormat, va_list Args)
 			if (*++pFormat == '%')
 			{
 				PutChar ('%');
-				
+
 				pFormat++;
 
 				continue;
@@ -588,11 +588,11 @@ void CString::PutChar (char chChar, size_t nCount)
 void CString::PutString (const char *pString)
 {
 	size_t nLen = strlen (pString);
-	
+
 	ReserveSpace (nLen);
-	
+
 	strcpy (m_pInPtr, pString);
-	
+
 	m_pInPtr += nLen;
 }
 
@@ -602,20 +602,20 @@ void CString::ReserveSpace (size_t nSpace)
 	{
 		return;
 	}
-	
+
 	size_t nOffset = m_pInPtr - m_pBuffer;
 	size_t nNewSize = nOffset + nSpace + 1;
 	if (m_nSize >= nNewSize)
 	{
 		return;
 	}
-	
+
 	nNewSize += FORMAT_RESERVE;
 	char *pNewBuffer = new char[nNewSize];
-		
+
 	*m_pInPtr = '\0';
 	strcpy (pNewBuffer, m_pBuffer);
-	
+
 	delete [] m_pBuffer;
 
 	m_pBuffer = pNewBuffer;
@@ -742,7 +742,7 @@ char *CString::ftoa (char *pDest, double fNumber, unsigned nPrecision)
 
 	fNumber -= (double) iPart;
 	fNumber *= (double) nPrecPow10;
-	
+
 	char Buffer[MAX_PRECISION+1];
 	ntoa (Buffer, (unsigned long) fNumber, 10, FALSE);
 
@@ -753,6 +753,6 @@ char *CString::ftoa (char *pDest, double fNumber, unsigned nPrecision)
 	}
 
 	strcpy (p, Buffer);
-	
+
 	return pDest;
 }

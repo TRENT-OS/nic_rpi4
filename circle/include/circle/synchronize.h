@@ -3,7 +3,7 @@
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
 // Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -20,6 +20,7 @@
 #ifndef _circle_synchronize_h
 #define _circle_synchronize_h
 
+#include <circle/sysconfig.h>
 #if AARCH == 64
 	#include <circle/synchronize64.h>
 #else

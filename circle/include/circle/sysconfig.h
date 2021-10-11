@@ -5,7 +5,7 @@
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
 // Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
-// 
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -21,6 +21,12 @@
 //
 #ifndef _circle_sysconfig_h
 #define _circle_sysconfig_h
+
+//------------------------------------------------------------------------------
+// custom definition
+#define RASPPI 4
+#define AARCH 64
+//------------------------------------------------------------------------------
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -361,6 +367,6 @@
 
 ///////////////////////////////////////////////////////////////////////
 
-#include <circle/memorymap.h>
+// #include <circle/memorymap.h>
 
 #endif
