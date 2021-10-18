@@ -1,0 +1,51 @@
+#pragma once
+
+#define MAILBOX_DATAPORT_PADDR  	0xFE00B000
+#define MAILBOX_DATAPORT_SIZE   	0x1000
+
+#define GENET_DATAPORT_PADDR      	0xFD580000
+#define GENET_DATAPORT_SIZE       	0x10000
+#define GENETA_IRQ                	189
+#define GENETB_IRQ                	190
+
+#define ETHERNET_EMITTING_COMPONENT_DEFINE \
+	dataport Buf(GENET_DATAPORT_SIZE) genetBaseReg; \
+	emits DataAvailable genetA_BaseIrq; \
+	emits DataAvailable genetB_BaseIrq;
+
+
+#define ETHERNET_CONSUMING_COMPONENT_DEFINE \
+	dataport Buf(GENET_DATAPORT_SIZE) genetBaseReg; \
+	consumes DataAvailable genetA_BaseIrq; \
+	consumes DataAvailable genetB_BaseIrq;
+
+
+#define ETHERNET_INSTANCE_CONNECT( \
+	_inst_,  \
+	_inst_eth_ \
+	) \
+	\
+    connection  seL4HardwareMMIO \
+        _inst_ ## _inst_eth_ ## _mmio( \
+            from _inst_.genetBaseReg, \
+            to   _inst_eth_.genetBaseReg \
+        ); \
+    \
+    connection  seL4HardwareInterrupt \
+        _inst_ ## _inst_eth_a_ ## _irq( \
+            from _inst_eth_.genetA_BaseIrq, \
+            to   _inst_.genetA_BaseIrq \
+        ); \
+    \
+    connection  seL4HardwareInterrupt \
+        _inst_ ## _inst_eth_b_ ## _irq( \
+            from _inst_eth_.genetB_BaseIrq, \
+            to   _inst_.genetB_BaseIrq \
+        );
+
+
+#define ETHERNET_INSTANCE_CONFIGURE_SELF(_inst_) \
+	_inst_.genetBaseReg_paddr      = GENET_DATAPORT_PADDR; \
+    _inst_.genetBaseReg_size       = GENET_DATAPORT_SIZE; \
+    _inst_.genetA_BaseIrq_irq_number = GENETA_IRQ; \
+    _inst_.genetB_BaseIrq_irq_number = GENETB_IRQ;
