@@ -11,23 +11,7 @@ import <std_connector.camkes>;
 import <if_OS_Timer.camkes>;
 import <if_OS_Logger.camkes>;
 
-//------------------------------------------------------------------------------
-
-
-#define NIC_RPI4_MAILBOX_BCM2711_DATAPORT_PADDR  	0xFE00B000
-#define NIC_RPI4_MAILBOX_BCM2711_DATAPORT_SIZE   	0x1000
-
-#define NIC_RPI4_SYSTIMER_BCM2711_DATAPORT_PADDR  	0xFE003000
-#define NIC_RPI4_SYSTIMER_BCM2711_DATAPORT_SIZE   	0x1000
-
-#define NIC_RPI4_GENET_BCM2711_DATAPORT_PADDR      	0xFD580000
-#define NIC_RPI4_GENET_BCM2711_DATAPORT_SIZE       	0x10000
-#define NIC_RPI4_GENETA_BCM2711_IRQ                	189
-#define NIC_RPI4_GENETB_BCM2711_IRQ                	190
-
-
-//------------------------------------------------------------------------------
-
+#include "plat_nic.camkes"
 
 //------------------------------------------------------------------------------
 // Component declaration
@@ -53,9 +37,7 @@ import <if_OS_Logger.camkes>;
     \
     component _name_ { \
         hardware; \
-        dataport Buf(NIC_RPI4_GENET_BCM2711_DATAPORT_SIZE) genetBaseReg; \
-        emits DataAvailable genetA_BaseIrq; \
-        emits DataAvailable genetB_BaseIrq; \
+        ETHERNET_EMITTING_COMPONENT_DEFINE \
     }
 
 #define NIC_RPi4_COMPONENT_DEFINE( \
@@ -68,9 +50,7 @@ import <if_OS_Logger.camkes>;
         /* lower interface to USB ------------------------------------- */ \
         dataport Buf systimerBaseReg; \
         dataport Buf mailboxBaseReg; \
-        dataport Buf(NIC_RPI4_GENET_BCM2711_DATAPORT_SIZE) genetBaseReg; \
-        consumes DataAvailable genetA_BaseIrq; \
-        consumes DataAvailable genetB_BaseIrq; \
+        ETHERNET_CONSUMING_COMPONENT_DEFINE \
         \
         /* upper interface as NIC Driver ---------------------------------- */ \
         provides if_OS_Nic nic_rpc; \
@@ -95,7 +75,7 @@ import <if_OS_Logger.camkes>;
     _inst_, \
     _inst_mb_, \
     _inst_st_, \
-    _inst_gn_) \
+    _inst_eth_) \
     \
     connection  seL4HardwareMMIO \
         _inst_ ## _inst_mb_ ## _mmio( \
@@ -109,23 +89,7 @@ import <if_OS_Logger.camkes>;
             to   _inst_st_.systimerBaseReg \
         ); \
     \
-    connection  seL4HardwareMMIO \
-        _inst_ ## _inst_gn_ ## _mmio( \
-            from _inst_.genetBaseReg, \
-            to   _inst_gn_.genetBaseReg \
-        ); \
-    \
-    connection  seL4HardwareInterrupt \
-        _inst_ ## _inst_gn_a_ ## _irq( \
-            from _inst_gn_.genetA_BaseIrq, \
-            to   _inst_.genetA_BaseIrq \
-        ); \
-    \
-    connection  seL4HardwareInterrupt \
-        _inst_ ## _inst_gn_b_ ## _irq( \
-            from _inst_gn_.genetB_BaseIrq, \
-            to   _inst_.genetB_BaseIrq \
-        );
+    ETHERNET_INSTANCE_CONNECT(_inst_,_inst_eth_)
 
 
 #define NIC_RPi4_INSTANCE_CONNECT_CLIENT( \
@@ -158,22 +122,19 @@ import <if_OS_Logger.camkes>;
 #define NIC_RPi4_Mailbox_INSTANCE_CONFIGURE_SELF( \
     _inst_) \
     \
-    _inst_.mailboxBaseReg_paddr  = NIC_RPI4_MAILBOX_BCM2711_DATAPORT_PADDR; \
-    _inst_.mailboxBaseReg_size   = NIC_RPI4_MAILBOX_BCM2711_DATAPORT_SIZE;
+    _inst_.mailboxBaseReg_paddr  = MAILBOX_DATAPORT_PADDR; \
+    _inst_.mailboxBaseReg_size   = MAILBOX_DATAPORT_SIZE;
 
 #define NIC_RPi4_Systimer_INSTANCE_CONFIGURE_SELF( \
     _inst_) \
     \
-    _inst_.systimerBaseReg_paddr  = NIC_RPI4_SYSTIMER_BCM2711_DATAPORT_PADDR; \
-    _inst_.systimerBaseReg_size   = NIC_RPI4_SYSTIMER_BCM2711_DATAPORT_SIZE;
+    _inst_.systimerBaseReg_paddr  = SYSTIMER_DATAPORT_PADDR; \
+    _inst_.systimerBaseReg_size   = SYSTIMER_DATAPORT_SIZE;
 
 #define NIC_RPi4_Genet_INSTANCE_CONFIGURE_SELF( \
     _inst_) \
     \
-    _inst_.genetBaseReg_paddr      = NIC_RPI4_GENET_BCM2711_DATAPORT_PADDR; \
-    _inst_.genetBaseReg_size       = NIC_RPI4_GENET_BCM2711_DATAPORT_SIZE; \
-    _inst_.genetA_BaseIrq_irq_number = NIC_RPI4_GENETA_BCM2711_IRQ; \
-    _inst_.genetB_BaseIrq_irq_number = NIC_RPI4_GENETB_BCM2711_IRQ;
+    ETHERNET_INSTANCE_CONFIGURE_SELF(_inst_)
 
 #define NIC_RPi4_INSTANCE_CONFIGURE( \
     _inst_, \

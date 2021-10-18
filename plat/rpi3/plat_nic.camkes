@@ -1,0 +1,45 @@
+#pragma once
+
+#define MAILBOX_DATAPORT_PADDR  	0x3F00B000
+#define MAILBOX_DATAPORT_SIZE   	0x1000
+
+#define SYSTIMER_DATAPORT_PADDR  	0x3F003000
+#define SYSTIMER_DATAPORT_SIZE   	0x1000
+
+#define USB_DATAPORT_PADDR          0x3F980000
+#define USB_DATAPORT_SIZE           0x1000
+#define USB_IRQ                     73
+
+
+#define ETHERNET_EMITTING_COMPONENT_DEFINE \
+    dataport Buf usbBaseReg; \
+    emits DataAvailable usbBaseIrq; \
+
+
+#define ETHERNET_CONSUMING_COMPONENT_DEFINE \
+    dataport Buf usbBaseReg; \
+    consumes DataAvailable usbBaseIrq; \
+
+
+#define ETHERNET_INSTANCE_CONNECT( \
+	_inst_,  \
+	_inst_eth_ \
+	) \
+	\
+    connection  seL4HardwareMMIO \
+        _inst_ ## _inst_eth_ ## _mmio( \
+            from _inst_.usbBaseReg, \
+            to   _inst_eth_.usbBaseReg \
+        ); \
+    \
+    connection  seL4HardwareInterrupt \
+        _inst_ ## _inst_eth_ ## _irq( \
+            from _inst_eth_.usbBaseIrq, \
+            to   _inst_.usbBaseIrq \
+        );
+
+
+#define ETHERNET_INSTANCE_CONFIGURE_SELF(_inst_) \
+    _inst_.usbBaseReg_paddr      = USB_DATAPORT_PADDR; \
+    _inst_.usbBaseReg_size       = USB_DATAPORT_SIZE; \
+    _inst_.usbBaseIrq_irq_number = USB_IRQ;

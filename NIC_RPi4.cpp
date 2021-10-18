@@ -13,8 +13,16 @@ extern "C" {
 
 #include <string.h>
 #include <stdlib.h>
-#include <circle/bcm54213.h>
 #include "environment.h"
+#include <circle/sysconfig.h>
+
+#if RASPPI <= 3
+#include <circle/netdevice.h>
+#include <circle/usb/usb.h>
+#include <circle/usb/usbhcidevice.h>
+#else
+#include <circle/bcm54213.h>
+#endif
 
 // HENSOLDT
 #include <stdlib.h>
@@ -49,7 +57,13 @@ operator delete[](void* p)
 
 //----------
 
-CBcm54213Device *m_Bcm54213;
+#if RASPPI <= 3
+	CUSBHCIDevice		*m_USBHCI;
+	CDWHCIDevice 		*pDWHCI;
+#else
+	CBcm54213Device		*m_Bcm54213;
+#endif
+CNetDevice *pEth0;
 
 // If we pass the define from a system configuration header. CAmkES generation
 // crashes when parsing this file. As a workaround we hardcode the value here
@@ -75,21 +89,38 @@ extern "C" void post_init(void)
         return;
     }
 
+#if RASPPI <= 3
+	// m_USBHCI = new CUSBHCIDevice();
+#else
 	m_Bcm54213 = new CBcm54213Device();
+#endif
     init_ok = true;
 }
 
 extern "C" int run(void)
 {
+#if RASPPI <= 3
+    if (!m_USBHCI->Initialize())
+	{
+		Debug_LOG_ERROR("Cannot initialize USBHCI");
+	}
+#else
     if (!m_Bcm54213->Initialize())
 	{
 		Debug_LOG_ERROR("Cannot initialize BCM54213");
 	}
+#endif
 
 	Debug_LOG_INFO("[EthDrv '%s'] starting", get_instance_name());
 
 	unsigned nTimeout = 0;
-	while (!m_Bcm54213->IsLinkUp())
+	pEth0 = CNetDevice::GetNetDevice (0);
+	if (pEth0 == 0)
+	{
+		Debug_LOG_ERROR("Net device not found");
+	}
+
+	while (!pEth0->IsLinkUp())
 	{
 		MsDelay (100);
 
@@ -115,7 +146,7 @@ extern "C" int run(void)
 	unsigned int count = 0;
 	while(true)
 	{
-		if(m_Bcm54213->ReceiveFrame(Buffer,(u32 *)&receivedLength))
+		if(pEth0->ReceiveFrame(Buffer,(u32 *)&receivedLength))
 		{
             OS_NetworkStack_RxBuffer_t* buf_ptr = (OS_NetworkStack_RxBuffer_t*)nic_to_port;
 
@@ -123,7 +154,7 @@ extern "C" int run(void)
             {
                 Debug_LOG_WARNING(
                     "The max length of the data is %u, but the length of the "
-                    "read data is %ld",
+                    "read data is %zu",
                     (unsigned)sizeof(buf_ptr->data),
                     receivedLength);
                 // throw away current frame and read the next one
@@ -162,7 +193,7 @@ nic_rpc_rx_data(
 extern "C" OS_Error_t nic_rpc_tx_data(
 	size_t* len)
 {
-	if (!m_Bcm54213->SendFrame(nic_from_port,*len))
+	if (!pEth0->SendFrame(nic_from_port,*len))
 	{
         Debug_LOG_ERROR("Bcm54213SendFrame failed");
 		return OS_ERROR_ABORTED;
@@ -182,6 +213,21 @@ extern "C" OS_Error_t nic_rpc_get_mac_address(void)
 
 	return OS_SUCCESS;
 }
+
+#if RASPPI <= 3
+/* USB interrupt handler -----------------------------------------------------------------*/
+void usbBaseIrq_handle(void) {
+	pDWHCI->InterruptHandler();
+
+	int error = usbBaseIrq_acknowledge();
+
+    if(error != 0)
+	{
+		Debug_LOG_ERROR("Failed to acknowledge the interrupt!");
+	}
+}
+
+#else
 
 /* Genet interrupt handler A-----------------------------------------------------------------*/
 extern "C" void genetA_BaseIrq_handle(void) {
@@ -206,3 +252,4 @@ extern "C" void genetB_BaseIrq_handle(void) {
 		Debug_LOG_ERROR("Failed to acknowledge the interrupt!");
 	}
 }
+#endif
