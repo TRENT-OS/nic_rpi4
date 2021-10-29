@@ -2,6 +2,7 @@
 # RPi4 (BCM2711) NIC driver
 #
 # Copyright (C) 2021, HENSOLDT Cyber GmbH
+# SPDX-License-Identifier: BSD-3-Clause
 #
 
 cmake_minimum_required(VERSION 3.18)
