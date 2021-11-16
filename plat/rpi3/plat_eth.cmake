@@ -7,4 +7,5 @@ NIC_RPi3_DeclareCAmkESComponent(
     CXX_FLAGS
 		-DRASPPI=3
         -DAARCH=32
+        -DNIC_DRIVER_RINGBUFFER_NUMBER_ELEMENTS=16
 )

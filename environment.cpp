@@ -78,6 +78,9 @@ LogWrite(
     case CIRCLE_LOG_DEBUG:
         printf("\n DEBUG %s: - ", pSource);
         break;
+    case CIRCLE_LOG_PANIC:
+        printf("\n PANIC %s: - ", pSource);
+        break;
     }
 
     vprintf(pMessage, args);
@@ -155,6 +158,12 @@ int
 GetMACAddress(unsigned char Buffer[6])
 {
     return mailbox_get_mac_address(&mbox, Buffer) ? 1 : 0;
+}
+
+int
+GetCMDLine(unsigned char Buffer[2048])
+{
+    return mailbox_get_cmd_line(&mbox, Buffer) ? 1 : 0;
 }
 
 unsigned

@@ -22,6 +22,7 @@ extern "C"
 #include <circle/netdevice.h>
 #include <circle/usb/usb.h>
 #include <circle/usb/usbhcidevice.h>
+#include <circle/koptions.h>
 #else
 #include <circle/bcm54213.h>
 #endif
@@ -59,11 +60,12 @@ operator delete[](void* p)
 //----------
 
 #if RASPPI <= 3
-static CUSBHCIDevice*	usbhciDevice;
+static CUSBHCIDevice	usbhciDevice;
 #else
-static CBcm54213Device* bcm54213Device;
+static CBcm54213Device bcm54213Device;
 #endif
-static CNetDevice*      netDevice;
+static CNetDevice*     netDevice;
+CKernelOptions		   m_Options;
 
 static volatile boolean initOk = false;
 
@@ -89,11 +91,13 @@ post_init(void)
         return;
     }
 
-#if RASPPI <= 3
-    usbhciDevice = new CUSBHCIDevice();
-#else
-    bcm54213Device = new CBcm54213Device();
-#endif
+// #if RASPPI <= 3
+//     // usbhciDevice = new CUSBHCIDevice();
+//     usbhciDevice = new CDWHCIDevice();
+// #else
+//     bcm54213Device = new CBcm54213Device();
+// #endif
+    Debug_LOG_DEBUG("Initialization done");
     initOk = true;
 }
 
@@ -107,13 +111,13 @@ run(void)
     }
 
 #if RASPPI <= 3
-    if (!usbhciDevice->Initialize())
+    if (!usbhciDevice.Initialize())
     {
         Debug_LOG_ERROR("Cannot initialize USBHCI");
         return OS_ERROR_GENERIC;
     }
 #else
-    if (!bcm54213Device->Initialize())
+    if (!bcm54213Device.Initialize())
     {
         Debug_LOG_ERROR("Cannot initialize BCM54213");
         return OS_ERROR_GENERIC;
@@ -250,7 +254,7 @@ nic_rpc_get_mac_address(void)
 void
 usbBaseIrq_handle(void)
 {
-    usbhciDevice->InterruptHandler();
+    usbhciDevice.InterruptHandler();
 
     int error = usbBaseIrq_acknowledge();
 
@@ -266,7 +270,7 @@ usbBaseIrq_handle(void)
 void
 genetA_BaseIrq_handle(void)
 {
-    bcm54213Device->InterruptHandler0();
+    bcm54213Device.InterruptHandler0();
 
     int error = genetA_BaseIrq_acknowledge();
 
@@ -280,7 +284,7 @@ genetA_BaseIrq_handle(void)
 void
 genetB_BaseIrq_handle(void)
 {
-    bcm54213Device->InterruptHandler1();
+    bcm54213Device.InterruptHandler1();
 
     int error = genetB_BaseIrq_acknowledge();
 
